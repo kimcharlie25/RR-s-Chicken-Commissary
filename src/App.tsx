@@ -12,10 +12,14 @@ import AdminLogin from './components/AdminLogin';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useMenu } from './hooks/useMenu';
 import { AuthProvider } from './contexts/AuthContext';
+import { CustomerAuthProvider } from './contexts/CustomerAuthContext';
+import { useCustomerAuth } from './hooks/useCustomerAuth';
+import CustomerLogin from './components/CustomerLogin';
 
 function MainApp() {
   const cart = useCart();
   const { menuItems } = useMenu();
+  const { logout, customer } = useCustomerAuth();
   const [currentView, setCurrentView] = React.useState<'menu' | 'cart' | 'checkout' | 'orderTracking'>('menu');
   const [selectedCategory, setSelectedCategory] = React.useState<string>('all');
 
@@ -28,13 +32,13 @@ function MainApp() {
   };
 
   // Filter menu items based on selected category
-  const filteredMenuItems = selectedCategory === 'all' 
-    ? menuItems 
+  const filteredMenuItems = selectedCategory === 'all'
+    ? menuItems
     : menuItems.filter(item => item.category === selectedCategory);
 
   return (
     <div className="min-h-screen bg-cream-50 font-inter">
-      <Header 
+      <Header
         cartItemsCount={cart.getTotalItems()}
         onCartClick={() => handleViewChange('cart')}
         onMenuClick={() => handleViewChange('menu')}
@@ -42,18 +46,32 @@ function MainApp() {
         onCategoryClick={handleCategoryClick}
         selectedCategory={selectedCategory}
       />
-      
+
+      <div className="max-w-7xl mx-auto px-4 py-2 flex justify-between items-center border-b border-branding-yellow bg-branding-yellow/10">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <span className="text-sm font-medium text-branding-primary/70">Branch: <span className="text-branding-red font-bold">{customer?.branch_name}</span></span>
+        </div>
+        <button
+          onClick={logout}
+          className="text-xs font-bold text-branding-primary/50 hover:text-branding-red transition-colors flex items-center gap-1 uppercase tracking-tighter"
+        >
+          Logout Session ({customer?.username})
+        </button>
+      </div>
+
       {currentView === 'menu' && (
-        <Menu 
+        <Menu
           menuItems={filteredMenuItems}
           addToCart={cart.addToCart}
           cartItems={cart.cartItems}
           updateQuantity={cart.updateQuantity}
         />
       )}
-      
+
+      {/* ... (rest of the views) ... */}
       {currentView === 'cart' && (
-        <Cart 
+        <Cart
           cartItems={cart.cartItems}
           updateQuantity={cart.updateQuantity}
           removeFromCart={cart.removeFromCart}
@@ -63,23 +81,23 @@ function MainApp() {
           onCheckout={() => handleViewChange('checkout')}
         />
       )}
-      
+
       {currentView === 'checkout' && (
-        <Checkout 
+        <Checkout
           cartItems={cart.cartItems}
           totalPrice={cart.getTotalPrice()}
           onBack={() => handleViewChange('cart')}
         />
       )}
-      
+
       {currentView === 'orderTracking' && (
-        <OrderTracking 
+        <OrderTracking
           onBack={() => handleViewChange('menu')}
         />
       )}
-      
+
       {currentView === 'menu' && (
-        <FloatingCartButton 
+        <FloatingCartButton
           itemCount={cart.getTotalItems()}
           onCartClick={() => handleViewChange('cart')}
         />
@@ -88,23 +106,42 @@ function MainApp() {
   );
 }
 
+function ProtectedCustomerRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useCustomerAuth();
+
+  if (!isAuthenticated) {
+    return <CustomerLogin />;
+  }
+
+  return <>{children}</>;
+}
+
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<MainApp />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route 
-            path="/admin" 
-            element={
-              <ProtectedRoute>
-                <AdminDashboard />
-              </ProtectedRoute>
-            } 
-          />
-        </Routes>
-      </Router>
+      <CustomerAuthProvider>
+        <Router>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <ProtectedCustomerRoute>
+                  <MainApp />
+                </ProtectedCustomerRoute>
+              }
+            />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Router>
+      </CustomerAuthProvider>
     </AuthProvider>
   );
 }

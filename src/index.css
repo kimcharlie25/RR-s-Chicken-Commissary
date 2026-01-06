@@ -2,9 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  body {
+    @apply font-inter text-branding-primary antialiased;
+    background-color: #ffffff;
+  }
+}
+
 /* ClickEats Custom Styles */
 .bg-cream-50 {
-  background-color: #fefce8;
+  background-color: #fffbeb;
 }
 
 .bg-cream-100 {

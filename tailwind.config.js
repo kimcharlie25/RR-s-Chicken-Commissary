@@ -4,6 +4,11 @@ export default {
   theme: {
     extend: {
       colors: {
+        branding: {
+          yellow: '#fcd109',
+          red: '#e72027',
+          primary: '#641810',
+        },
         red: {
           50: '#fef2f2',
           100: '#fee2e2',
