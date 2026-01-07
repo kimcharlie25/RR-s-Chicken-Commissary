@@ -106,168 +106,134 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
 
   return (
     <>
-      <div className={`bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group animate-scale-in border border-gray-100 ${!item.available ? 'opacity-60' : ''}`}>
-        {/* Image Container with Badges */}
-        <div className="relative h-48 bg-gradient-to-br from-gray-50 to-gray-100">
-          {item.image ? (
-            <img
-              src={item.image}
-              alt={item.name}
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-              loading="lazy"
-              decoding="async"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.nextElementSibling?.classList.remove('hidden');
-              }}
-            />
-          ) : null}
-          <div className={`absolute inset-0 flex items-center justify-center ${item.image ? 'hidden' : ''}`}>
-            <div className="text-6xl opacity-20 text-gray-400">☕</div>
-          </div>
+      <div className={`bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group animate-fade-in border border-gray-100 ${!item.available ? 'opacity-60' : ''}`}>
+        <div className="p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+          {/* Item Info */}
+          <div className="flex-1">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <h4 className="text-lg font-bold text-branding-primary uppercase tracking-tight">
+                {item.name}
+              </h4>
 
-          {/* Badges */}
-          <div className="absolute top-3 left-3 flex flex-col gap-2">
-            {item.isOnDiscount && item.discountPrice && (
-              <div className="bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg animate-pulse">
-                SALE
+              {/* Minimal Badges */}
+              <div className="flex gap-1">
+                {item.isOnDiscount && item.discountPrice && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    SALE
+                  </span>
+                )}
+                {item.popular && (
+                  <span className="bg-branding-yellow text-branding-primary text-[10px] font-black px-2 py-0.5 rounded-full">
+                    ⭐
+                  </span>
+                )}
+                {!item.available && (
+                  <span className="bg-gray-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    UNAVAILABLE
+                  </span>
+                )}
               </div>
-            )}
-            {item.popular && (
-              <div className="bg-branding-yellow text-branding-primary text-[10px] font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-widest">
-                ⭐ POPULAR
-              </div>
-            )}
-          </div>
-
-          {!item.available && (
-            <div className="absolute top-3 right-3 bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">
-              UNAVAILABLE
             </div>
-          )}
 
-          {/* Discount Percentage Badge */}
-          {showDiscount && discountedPrice !== undefined && (
-            <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm text-red-600 text-xs font-bold px-2 py-1 rounded-full shadow-lg">
-              {Math.round(((basePrice - discountedPrice) / basePrice) * 100)}% OFF
+            <p className={`text-sm leading-relaxed ${!item.available ? 'text-gray-400' : 'text-gray-600'}`}>
+              {!item.available ? 'Currently Unavailable' : item.description}
+            </p>
+
+            <div className="flex flex-wrap gap-2 mt-2">
+              {item.variations && item.variations.length > 0 && (
+                <span className="text-[10px] font-black text-branding-primary/50 bg-branding-primary/5 px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                  {item.variations.length} sizes
+                </span>
+              )}
+              {item.addOns && item.addOns.length > 0 && (
+                <span className="text-[10px] font-black text-branding-primary/50 bg-branding-primary/5 px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                  {item.addOns.length} add-ons
+                </span>
+              )}
             </div>
-          )}
-        </div>
-
-        {/* Content */}
-        <div className="p-5">
-          <div className="flex items-start justify-between mb-3">
-            <h4 className="text-lg font-bold text-branding-primary leading-tight flex-1 pr-2 uppercase tracking-tight">{item.name}</h4>
-            {item.variations && item.variations.length > 0 && (
-              <div className="text-[10px] font-black text-branding-primary/50 bg-branding-primary/5 px-2 py-1 rounded-full whitespace-nowrap uppercase tracking-tighter">
-                {item.variations.length} sizes
-              </div>
-            )}
           </div>
 
-          <p className={`text-sm mb-4 leading-relaxed ${!item.available ? 'text-gray-400' : 'text-gray-600'}`}>
-            {!item.available ? 'Currently Unavailable' : item.description}
-          </p>
-
-          {/* Pricing Section */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex-1">
+          {/* Pricing & Actions */}
+          <div className="flex items-center justify-between sm:justify-end gap-4 sm:min-w-[240px]">
+            <div className="text-right">
               {showDiscount && discountedPrice !== undefined ? (
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-2xl font-black text-branding-red">
-                      ₱{discountedPrice.toFixed(0)}
-                    </span>
+                <div className="flex flex-col items-end">
+                  <div className="flex items-center gap-2">
                     <span className="text-sm text-branding-primary/40 line-through">
                       ₱{basePrice.toFixed(0)}
                     </span>
+                    <span className="text-xl font-black text-branding-red">
+                      ₱{discountedPrice.toFixed(0)}
+                    </span>
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Save ₱{(basePrice - discountedPrice).toFixed(2)}
-                  </div>
+                  <span className="text-[10px] text-red-600 font-bold uppercase">
+                    Save {Math.round(((basePrice - discountedPrice) / basePrice) * 100)}%
+                  </span>
                 </div>
               ) : (
-                <div className="text-2xl font-black text-branding-primary">
+                <div className="text-xl font-black text-branding-primary">
                   ₱{basePrice.toFixed(0)}
                 </div>
               )}
-
               {item.variations && item.variations.length > 0 && (
-                <div className="text-xs text-gray-500 mt-1">
-                  Starting price
+                <div className="text-[10px] text-gray-500">
+                  Starts at
                 </div>
               )}
             </div>
 
-            {/* Action Buttons */}
             <div className="flex-shrink-0">
               {!item.available ? (
                 <button
                   disabled
-                  className="bg-gray-200 text-gray-500 px-4 py-2.5 rounded-xl cursor-not-allowed font-medium text-sm"
+                  className="bg-gray-100 text-gray-400 px-4 py-2 rounded-lg cursor-not-allowed font-medium text-xs uppercase"
                 >
-                  Unavailable
+                  Sold Out
                 </button>
               ) : quantity === 0 ? (
                 <button
                   onClick={handleAddToCart}
-                  className="bg-branding-red text-white px-6 py-2.5 rounded-xl hover:opacity-90 transition-all duration-200 transform hover:scale-105 font-bold text-xs uppercase tracking-widest shadow-lg shadow-branding-red/20"
+                  className="bg-branding-red text-white px-5 py-2 rounded-lg hover:opacity-90 transition-all duration-200 font-bold text-xs uppercase tracking-widest shadow-md shadow-branding-red/10"
                 >
-                  {item.variations?.length || item.addOns?.length ? 'Customize' : 'Add to Cart'}
+                  {item.variations?.length || item.addOns?.length ? 'Customize' : 'Add'}
                 </button>
               ) : (
-                <div className="flex items-center space-x-2 bg-branding-yellow/20 rounded-xl p-1 border border-branding-yellow/50">
+                <div className="flex items-center space-x-2 bg-branding-yellow/10 rounded-lg p-1 border border-branding-yellow/30">
                   <button
                     onClick={handleDecrement}
-                    className="p-2 hover:bg-branding-yellow/50 rounded-lg transition-colors duration-200"
+                    className="p-1.5 hover:bg-branding-yellow/30 rounded-md transition-colors duration-200"
                   >
-                    <Minus className="h-4 w-4 text-branding-primary" />
+                    <Minus className="h-3.5 w-3.5 text-branding-primary" />
                   </button>
-                  <span className="font-black text-branding-primary min-w-[28px] text-center text-sm">{quantity}</span>
+                  <span className="font-black text-branding-primary min-w-[20px] text-center text-xs">{quantity}</span>
                   <button
                     onClick={handleIncrement}
-                    className="p-2 hover:bg-branding-yellow/50 rounded-lg transition-colors duration-200"
+                    className="p-1.5 hover:bg-branding-yellow/30 rounded-md transition-colors duration-200"
                   >
-                    <Plus className="h-4 w-4 text-branding-primary" />
+                    <Plus className="h-3.5 w-3.5 text-branding-primary" />
                   </button>
                 </div>
               )}
             </div>
           </div>
-
-          {/* Stock indicator */}
-          {item.trackInventory && item.stockQuantity !== null && (
-            <div className="mt-3">
-              {item.stockQuantity > item.lowStockThreshold ? (
-                <div className="flex items-center space-x-2 text-xs text-green-700 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
-                  <span className="font-semibold">✓</span>
-                  <span className="font-medium">{item.stockQuantity} in stock</span>
-                </div>
-              ) : item.stockQuantity > 0 ? (
-                <div className="flex items-center space-x-2 text-xs text-orange-700 bg-orange-50 px-3 py-2 rounded-lg border border-orange-200 animate-pulse">
-                  <span className="font-semibold">⚠️</span>
-                  <span className="font-medium">Only {item.stockQuantity} left!</span>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-2 text-xs text-red-700 bg-red-50 px-3 py-2 rounded-lg border border-red-200">
-                  <span className="font-semibold">✕</span>
-                  <span className="font-medium">Out of stock</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Add-ons indicator */}
-          {item.addOns && item.addOns.length > 0 && (
-            <div className="flex items-center space-x-1 text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded-lg mt-2">
-              <span>+</span>
-              <span>{item.addOns.length} add-on{item.addOns.length > 1 ? 's' : ''} available</span>
-            </div>
-          )}
         </div>
+
+        {/* Stock indicator - small bar at bottom */}
+        {item.trackInventory && item.stockQuantity !== null && (
+          <div className="px-4 pb-2">
+            {item.stockQuantity !== undefined && item.lowStockThreshold !== undefined && item.stockQuantity <= item.lowStockThreshold && item.stockQuantity > 0 ? (
+              <div className="text-[10px] text-orange-600 font-bold animate-pulse">
+                Low stock: {item.stockQuantity} left
+              </div>
+            ) : item.stockQuantity === 0 ? (
+              <div className="text-[10px] text-red-600 font-bold">
+                Out of stock
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
 
-      {/* Customization Modal */}
       {showCustomization && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -316,8 +282,8 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
                       <label
                         key={variation.id}
                         className={`flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 ${selectedVariation?.id === variation.id
-                            ? 'border-branding-red bg-branding-red/5'
-                            : 'border-gray-100 hover:border-branding-yellow hover:bg-branding-yellow/5'
+                          ? 'border-branding-red bg-branding-red/5'
+                          : 'border-gray-100 hover:border-branding-yellow hover:bg-branding-yellow/5'
                           }`}
                       >
                         <div className="flex items-center space-x-3">
