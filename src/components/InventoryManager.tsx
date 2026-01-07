@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, AlertTriangle, Minus, Plus, RefreshCw } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Minus, Plus, RefreshCw, Save } from 'lucide-react';
 import { MenuItem } from '../types';
 
 type InventoryManagerProps = {
@@ -12,6 +12,8 @@ type InventoryManagerProps = {
 const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUpdateItem, loading }) => {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<MenuItem>>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   const filteredItems = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -22,74 +24,119 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
     );
   }, [items, query]);
 
-  const adjustStock = async (item: MenuItem, delta: number) => {
-    if (!item.trackInventory) return;
-    const current = item.stockQuantity ?? 0;
-    const next = Math.max(0, current + delta);
-    setProcessingId(item.id);
-    try {
-      await onUpdateItem(item.id, {
+  const adjustStock = (item: MenuItem, delta: number) => {
+    // Determine current effective stock (from pending or original)
+    const pending = pendingChanges[item.id] || {};
+    const currentTrack = pending.trackInventory ?? item.trackInventory;
+
+    if (!currentTrack) return;
+
+    const currentStock = pending.stockQuantity ?? item.stockQuantity ?? 0;
+    const next = Math.max(0, currentStock + delta);
+
+    setPendingChanges(prev => ({
+      ...prev,
+      [item.id]: {
+        ...prev[item.id],
         trackInventory: true,
-        stockQuantity: next,
-      });
-    } catch (error) {
-      console.error('Failed to adjust stock', error);
-      alert('Failed to adjust stock. Please try again.');
-    } finally {
-      setProcessingId(null);
-    }
+        stockQuantity: next
+      }
+    }));
   };
 
-  const updateStock = async (item: MenuItem, rawValue: string) => {
-    if (!item.trackInventory) return;
+  const updateStock = (item: MenuItem, rawValue: string) => {
+    const pending = pendingChanges[item.id] || {};
+    const currentTrack = pending.trackInventory ?? item.trackInventory;
+
+    if (!currentTrack) return;
+
     const numeric = Math.max(0, Math.floor(Number(rawValue)) || 0);
-    setProcessingId(item.id);
-    try {
-      await onUpdateItem(item.id, {
+
+    setPendingChanges(prev => ({
+      ...prev,
+      [item.id]: {
+        ...prev[item.id],
         trackInventory: true,
-        stockQuantity: numeric,
-      });
-    } catch (error) {
-      console.error('Failed to update stock value', error);
-      alert('Failed to update stock value. Please try again.');
-    } finally {
-      setProcessingId(null);
-    }
+        stockQuantity: numeric
+      }
+    }));
   };
 
-  const updateThreshold = async (item: MenuItem, rawValue: string) => {
-    if (!item.trackInventory) return;
+  const updateThreshold = (item: MenuItem, rawValue: string) => {
+    const pending = pendingChanges[item.id] || {};
+    const currentTrack = pending.trackInventory ?? item.trackInventory;
+
+    if (!currentTrack) return;
+
     const numeric = Math.max(0, Math.floor(Number(rawValue)) || 0);
-    setProcessingId(item.id);
-    try {
-      await onUpdateItem(item.id, {
+
+    setPendingChanges(prev => ({
+      ...prev,
+      [item.id]: {
+        ...prev[item.id],
         trackInventory: true,
-        lowStockThreshold: numeric,
-      });
+        lowStockThreshold: numeric
+      }
+    }));
+  };
+
+  const toggleTracking = (item: MenuItem, track: boolean) => {
+    setPendingChanges(prev => {
+      const currentPending = prev[item.id] || {};
+      const stock = currentPending.stockQuantity ?? item.stockQuantity ?? 0;
+      const threshold = currentPending.lowStockThreshold ?? item.lowStockThreshold ?? 0;
+
+      return {
+        ...prev,
+        [item.id]: {
+          ...currentPending,
+          trackInventory: track,
+          stockQuantity: track ? Math.max(0, Math.floor(Number(stock))) : null,
+          lowStockThreshold: track ? Math.max(0, Math.floor(Number(threshold))) : 0,
+        }
+      };
+    });
+  };
+
+  const handleSave = async () => {
+    const idsToUpdate = Object.keys(pendingChanges);
+    if (idsToUpdate.length === 0) return;
+
+    setIsSaving(true);
+    try {
+      // Process updates sequentially to avoid race conditions/overwhelming server
+      for (const id of idsToUpdate) {
+        setProcessingId(id);
+        const updates = pendingChanges[id];
+
+        // Calculate available status based on new values
+        const item = items.find(i => i.id === id);
+        if (item) {
+          const finalStock = updates.stockQuantity ?? item.stockQuantity ?? 0;
+          const finalThreshold = updates.lowStockThreshold ?? item.lowStockThreshold ?? 0;
+          const finalTrack = updates.trackInventory ?? item.trackInventory;
+
+          if (finalTrack) {
+            updates.available = finalStock > finalThreshold;
+          }
+        }
+
+        await onUpdateItem(id, updates);
+      }
+      setPendingChanges({});
+      alert('All changes saved successfully!');
     } catch (error) {
-      console.error('Failed to update threshold', error);
-      alert('Failed to update threshold. Please try again.');
+      console.error('Failed to save changes', error);
+      alert('Failed to save some changes. Please try again.');
     } finally {
+      setIsSaving(false);
       setProcessingId(null);
     }
   };
 
-  const toggleTracking = async (item: MenuItem, track: boolean) => {
-    setProcessingId(item.id);
-    try {
-      await onUpdateItem(item.id, {
-        trackInventory: track,
-        stockQuantity: track ? Math.max(0, Math.floor(Number(item.stockQuantity ?? 0))) : null,
-        lowStockThreshold: track ? Math.max(0, Math.floor(Number(item.lowStockThreshold ?? 0))) : 0,
-        available: track
-          ? (item.stockQuantity ?? 0) > (item.lowStockThreshold ?? 0)
-          : item.available,
-      });
-    } catch (error) {
-      console.error('Failed to toggle inventory tracking', error);
-      alert('Failed to update inventory tracking. Please try again.');
-    } finally {
-      setProcessingId(null);
+  const handleDiscard = () => {
+    if (confirm('Discard all unsaved changes?')) {
+      setPendingChanges({});
     }
   };
 
@@ -109,6 +156,11 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
                 <span>Dashboard</span>
               </button>
               <h1 className="text-2xl font-playfair font-semibold text-black">Inventory Management</h1>
+              {Object.keys(pendingChanges).length > 0 && (
+                <span className="ml-4 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                  Unsaved Changes
+                </span>
+              )}
             </div>
             <div className="text-sm text-gray-500">
               {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}
@@ -148,16 +200,23 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredItems.map((item) => {
-                  const tracking = item.trackInventory ?? false;
-                  const stock = tracking ? item.stockQuantity ?? 0 : null;
-                  const threshold = tracking ? item.lowStockThreshold ?? 0 : null;
+                  const pending = pendingChanges[item.id] || {};
+                  const hasChanges = Object.keys(pending).length > 0;
+
+                  // Merge original item with pending changes
+                  const mergedItem = { ...item, ...pending };
+
+                  const tracking = mergedItem.trackInventory ?? false;
+                  const stock = tracking ? mergedItem.stockQuantity ?? 0 : null;
+                  const threshold = tracking ? mergedItem.lowStockThreshold ?? 0 : null;
                   const low = tracking && stock !== null && threshold !== null && stock <= threshold;
                   return (
-                    <tr key={item.id} className={low ? 'bg-red-50/40' : undefined}>
+                    <tr key={item.id} className={`${low ? 'bg-red-50/40' : ''} ${hasChanges ? 'bg-yellow-50/50' : ''}`}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-col">
-                          <span className="text-sm font-medium text-gray-900">{item.name}</span>
-                          <span className="text-xs text-gray-500">{item.category}</span>
+                          <span className="text-sm font-medium text-gray-900">{mergedItem.name}</span>
+                          <span className="text-xs text-gray-500">{mergedItem.category}</span>
+                          {hasChanges && <span className="text-[10px] text-yellow-600 font-medium">Modified</span>}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -186,8 +245,8 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
                             <input
                               type="number"
                               min={0}
-                              defaultValue={stock ?? 0}
-                              onBlur={(e) => updateStock(item, e.target.value)}
+                              value={stock ?? 0}
+                              onChange={(e) => updateStock(item, e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                   e.currentTarget.blur();
@@ -214,8 +273,8 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
                           <input
                             type="number"
                             min={0}
-                            defaultValue={threshold ?? 0}
-                            onBlur={(e) => updateThreshold(item, e.target.value)}
+                            value={threshold ?? 0}
+                            onChange={(e) => updateThreshold(item, e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.currentTarget.blur();
@@ -245,7 +304,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
                               Not tracking
                             </span>
                           )}
-                          {item.autoDisabled && (
+                          {mergedItem.autoDisabled && (
                             <span className="inline-flex items-center space-x-1 text-xs text-red-600">
                               <AlertTriangle className="h-3.5 w-3.5" />
                               <span>Disabled</span>
@@ -276,6 +335,47 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
           </div>
         </div>
       </div>
+
+      {/* Save Changes Floating Bar */}
+      {Object.keys(pendingChanges).length > 0 && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-xl border border-gray-200 p-4 flex items-center gap-4 z-50 animate-fade-in-up">
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-gray-900">
+              {Object.keys(pendingChanges).length} item(s) modified
+            </span>
+            <span className="text-xs text-gray-500">
+              Don't forget to save your changes
+            </span>
+          </div>
+          <div className="h-8 w-px bg-gray-200"></div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDiscard}
+              disabled={isSaving}
+              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            >
+              Discard
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSaving ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  <span>Save Changes</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
