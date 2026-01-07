@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Save, X, ArrowLeft, Coffee, TrendingUp, Package, Users, FolderOpen, CreditCard, Settings, ShoppingCart, LogOut, Boxes, Key } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Edit, Trash2, Save, X, ArrowLeft, Coffee, TrendingUp, Package, Users, FolderOpen, CreditCard, Settings, ShoppingCart, LogOut, Boxes, Key, Search } from 'lucide-react';
 import { MenuItem, Variation, AddOn } from '../types';
 import { addOnCategories } from '../data/menuData';
 import { useMenu } from '../hooks/useMenu';
@@ -23,6 +23,7 @@ const AdminDashboard: React.FC = () => {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showBulkActions, setShowBulkActions] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState<Partial<MenuItem>>({
     name: '',
     description: '',
@@ -185,15 +186,18 @@ const AdminDashboard: React.FC = () => {
     );
   };
 
-  const handleSelectAll = () => {
-    if (selectedItems.length === menuItems.length) {
-      setSelectedItems([]);
-      setShowBulkActions(false);
-    } else {
-      setSelectedItems(menuItems.map(item => item.id));
-      setShowBulkActions(true);
-    }
-  };
+
+  // Filter menu items based on search query
+  const filteredMenuItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return menuItems;
+
+    return menuItems.filter(item =>
+      item.name.toLowerCase().includes(q) ||
+      item.description.toLowerCase().includes(q) ||
+      item.category.toLowerCase().includes(q)
+    );
+  }, [menuItems, searchQuery]);
 
   // Update bulk actions visibility when selection changes
   React.useEffect(() => {
@@ -599,7 +603,10 @@ const AdminDashboard: React.FC = () => {
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center space-x-4">
                 <button
-                  onClick={() => setCurrentView('dashboard')}
+                  onClick={() => {
+                    setCurrentView('dashboard');
+                    setSearchQuery('');
+                  }}
                   className="flex items-center space-x-2 text-gray-600 hover:text-black transition-colors duration-200"
                 >
                   <ArrowLeft className="h-5 w-5" />
@@ -607,20 +614,8 @@ const AdminDashboard: React.FC = () => {
                 </button>
                 <h1 className="text-2xl font-playfair font-semibold text-black">Menu Items</h1>
               </div>
+
               <div className="flex items-center space-x-3">
-                {showBulkActions && (
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-600">
-                      {selectedItems.length} item(s) selected
-                    </span>
-                    <button
-                      onClick={() => setShowBulkActions(!showBulkActions)}
-                      className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200"
-                    >
-                      <span>Bulk Actions</span>
-                    </button>
-                  </div>
-                )}
                 <button
                   onClick={handleAddItem}
                   className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors duration-200"
@@ -634,6 +629,28 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 py-8">
+          {/* Search Bar Section */}
+          <div className="bg-white rounded-xl shadow-sm p-4 mb-6 border border-gray-200">
+            <div className="max-w-md relative">
+              <Search className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search menu items..."
+                className="w-full pl-9 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Bulk Actions Panel */}
           {showBulkActions && selectedItems.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border-l-4 border-blue-500">
@@ -692,19 +709,25 @@ const AdminDashboard: React.FC = () => {
 
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             {/* Bulk Actions Bar */}
-            {menuItems.length > 0 && (
+            {filteredMenuItems.length > 0 && (
               <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <label className="flex items-center space-x-2">
                       <input
                         type="checkbox"
-                        checked={selectedItems.length === menuItems.length && menuItems.length > 0}
-                        onChange={handleSelectAll}
+                        checked={selectedItems.length === filteredMenuItems.length && filteredMenuItems.length > 0}
+                        onChange={() => {
+                          if (selectedItems.length === filteredMenuItems.length) {
+                            setSelectedItems([]);
+                          } else {
+                            setSelectedItems(filteredMenuItems.map(item => item.id));
+                          }
+                        }}
                         className="rounded border-gray-300 text-green-600 focus:ring-green-500"
                       />
                       <span className="text-sm font-medium text-gray-700">
-                        Select All ({menuItems.length} items)
+                        Select All ({filteredMenuItems.length} items)
                       </span>
                     </label>
                   </div>
@@ -743,7 +766,7 @@ const AdminDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {menuItems.map((item) => (
+                  {filteredMenuItems.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <input

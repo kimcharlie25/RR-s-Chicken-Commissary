@@ -226,30 +226,36 @@ const OrdersManager: React.FC<OrdersManagerProps> = ({ onBack }) => {
             const doc = new jsPDF();
 
             // Header
+            doc.addImage('/logo.jpg', 'JPEG', 14, 10, 25, 25)
             doc.setFontSize(20);
             doc.setTextColor(100, 24, 16);
             doc.setFont('helvetica', 'bold');
             doc.text("RR's Chicken Commissary", 105, 15, { align: 'center' });
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(0);
-            doc.setFontSize(12);
+            doc.setTextColor(255, 0, 0);
+            doc.setFontSize(14);
             doc.text("INVOICE", 105, 22, { align: 'center' });
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.setTextColor(0);
+            doc.text("rrscommissary@gmail.com", 105, 26, { align: 'center' });
+            doc.text("09244722191", 105, 30, { align: 'center' });
+            doc.text("Kapalaran 3 Road, San Roque, Navotas City. 1484", 105, 34, { align: 'center' });
 
             // Order Details
             doc.setFontSize(10);
-            doc.text(`Order #: ${order.id.slice(-8).toUpperCase()}`, 14, 35);
-            doc.text(`Date: ${new Date(order.created_at).toLocaleDateString()}`, 14, 40);
+            doc.text(`Order #: ${order.id.slice(-8).toUpperCase()}`, 14, 44);
+            doc.text(`Date: ${new Date(order.created_at).toLocaleDateString()}`, 14, 49);
             // Customer Details Column
             doc.setFontSize(10);
             doc.setFont('helvetica', 'bold');
-            doc.text('Customer Details:', 14, 45);
+            doc.text('Customer Details:', 14, 54);
             doc.setFont('helvetica', 'normal');
             doc.text([
                 `Name: ${order.customer_name}`,
                 `Branch: ${order.branch_name || 'N/A'}`,
                 `Contact: ${order.contact_number}`,
                 `Service: ${order.service_type.charAt(0).toUpperCase() + order.service_type.slice(1)}`
-            ], 14, 50);
+            ], 14, 57);
 
             // Table Data
             const tableColumn = ["#", "Items", "Unit (Description)", "Quantity", "Unit Cost", "Total"];
