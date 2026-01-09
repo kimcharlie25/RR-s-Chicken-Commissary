@@ -15,6 +15,9 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
   const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<MenuItem>>>({});
   const [isSaving, setIsSaving] = useState(false);
 
+  // Local state for stock adjustment inputs: { [itemId]: { in: '0', out: '0' } }
+  const [adjustmentInputs, setAdjustmentInputs] = useState<Record<string, { in: string; out: string }>>({});
+
   const filteredItems = useMemo(() => {
     const term = query.trim().toLowerCase();
     if (!term) return items;
@@ -24,46 +27,61 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
     );
   }, [items, query]);
 
-  const adjustStock = (item: MenuItem, delta: number) => {
-    // Determine current effective stock (from pending or original)
-    const pending = pendingChanges[item.id] || {};
-    const currentTrack = pending.trackInventory ?? item.trackInventory;
+  const getAdjustmentValue = (itemId: string, type: 'in' | 'out') => {
+    return adjustmentInputs[itemId]?.[type] || '';
+  };
 
-    if (!currentTrack) return;
-
-    const currentStock = pending.stockQuantity ?? item.stockQuantity ?? 0;
-    const next = Math.max(0, currentStock + delta);
-
-    setPendingChanges(prev => ({
+  const setAdjustmentValue = (itemId: string, type: 'in' | 'out', value: string) => {
+    setAdjustmentInputs(prev => ({
       ...prev,
-      [item.id]: {
-        ...prev[item.id],
-        trackInventory: true,
-        stockQuantity: next
+      [itemId]: {
+        ...prev[itemId],
+        [type]: value
       }
     }));
   };
 
-  const updateStock = (item: MenuItem, rawValue: string) => {
+  const commitStockAdjustment = (item: MenuItem, type: 'in' | 'out') => {
+    const rawValue = getAdjustmentValue(item.id, type);
+    const delta = Math.floor(Number(rawValue));
+
+    if (!delta || delta <= 0) return;
+
+    // Determine current effective stock
     const pending = pendingChanges[item.id] || {};
-    const currentTrack = pending.trackInventory ?? item.trackInventory;
+    const currentStock = Number(pending.stockQuantity ?? item.stockQuantity ?? 0);
 
-    if (!currentTrack) return;
-
-    const numeric = Math.max(0, Math.floor(Number(rawValue)) || 0);
+    // Calculate new stock
+    const change = type === 'in' ? delta : -delta;
+    const nextStock = Math.max(0, currentStock + change);
 
     setPendingChanges(prev => ({
       ...prev,
       [item.id]: {
         ...prev[item.id],
-        trackInventory: true,
-        stockQuantity: numeric
+        trackInventory: true, // Auto-enable tracking if adjusting stock
+        stockQuantity: nextStock
+      }
+    }));
+
+    // Reset input
+    setAdjustmentValue(item.id, type, '');
+  };
+
+  const updatePrice = (item: MenuItem, rawValue: string) => {
+    const price = Math.max(0, parseFloat(rawValue) || 0);
+    setPendingChanges(prev => ({
+      ...prev,
+      [item.id]: {
+        ...prev[item.id],
+        basePrice: price
       }
     }));
   };
 
   const updateThreshold = (item: MenuItem, rawValue: string) => {
     const pending = pendingChanges[item.id] || {};
+    // Ensure we keep existing tracking state or default to item state
     const currentTrack = pending.trackInventory ?? item.trackInventory;
 
     if (!currentTrack) return;
@@ -85,6 +103,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
       const currentPending = prev[item.id] || {};
       const stock = currentPending.stockQuantity ?? item.stockQuantity ?? 0;
       const threshold = currentPending.lowStockThreshold ?? item.lowStockThreshold ?? 0;
+      const price = currentPending.basePrice ?? item.basePrice;
 
       return {
         ...prev,
@@ -93,6 +112,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
           trackInventory: track,
           stockQuantity: track ? Math.max(0, Math.floor(Number(stock))) : null,
           lowStockThreshold: track ? Math.max(0, Math.floor(Number(threshold))) : 0,
+          basePrice: price
         }
       };
     });
@@ -104,7 +124,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
 
     setIsSaving(true);
     try {
-      // Process updates sequentially to avoid race conditions/overwhelming server
+      // Process updates sequentially
       for (const id of idsToUpdate) {
         setProcessingId(id);
         const updates = pendingChanges[id];
@@ -124,6 +144,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
         await onUpdateItem(id, updates);
       }
       setPendingChanges({});
+      setAdjustmentInputs({});
       alert('All changes saved successfully!');
     } catch (error) {
       console.error('Failed to save changes', error);
@@ -137,6 +158,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
   const handleDiscard = () => {
     if (confirm('Discard all unsaved changes?')) {
       setPendingChanges({});
+      setAdjustmentInputs({});
     }
   };
 
@@ -194,6 +216,9 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tracking</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">In Stock</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Out Stock</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Threshold</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 </tr>
@@ -210,6 +235,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
                   const stock = tracking ? mergedItem.stockQuantity ?? 0 : null;
                   const threshold = tracking ? mergedItem.lowStockThreshold ?? 0 : null;
                   const low = tracking && stock !== null && threshold !== null && stock <= threshold;
+
                   return (
                     <tr key={item.id} className={`${low ? 'bg-red-50/40' : ''} ${hasChanges ? 'bg-yellow-50/50' : ''}`}>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -233,39 +259,85 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {tracking ? (
+                          <span className="text-sm font-bold text-gray-900">{stock}</span>
+                        ) : (
+                          <span className="text-sm text-gray-400">--</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <span className="text-gray-500 mr-1">₱</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            value={mergedItem.basePrice ?? 0}
+                            onChange={(e) => updatePrice(item, e.target.value)}
+                            disabled={isProcessing(item.id)}
+                            className="w-24 px-2 py-1.5 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {tracking ? (
                           <div className="flex items-center space-x-2">
-                            <button
-                              type="button"
-                              onClick={() => adjustStock(item, -1)}
-                              disabled={isProcessing(item.id) || !tracking || stock === null || stock === 0}
-                              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40"
-                            >
-                              <Minus className="h-4 w-4" />
-                            </button>
                             <input
                               type="number"
                               min={0}
-                              value={stock ?? 0}
-                              onChange={(e) => updateStock(item, e.target.value)}
+                              placeholder="Qty"
+                              value={getAdjustmentValue(item.id, 'in')}
+                              onChange={(e) => setAdjustmentValue(item.id, 'in', e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
+                                  commitStockAdjustment(item, 'in');
                                   e.currentTarget.blur();
                                 }
                               }}
                               disabled={isProcessing(item.id)}
-                              className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                              className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder-gray-400"
                             />
                             <button
                               type="button"
-                              onClick={() => adjustStock(item, 1)}
-                              disabled={isProcessing(item.id) || !tracking}
-                              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40"
+                              onClick={() => commitStockAdjustment(item, 'in')}
+                              disabled={isProcessing(item.id) || !getAdjustmentValue(item.id, 'in')}
+                              className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-green-50 text-green-600 disabled:opacity-40 disabled:hover:bg-white"
                             >
                               <Plus className="h-4 w-4" />
                             </button>
                           </div>
                         ) : (
-                          <span className="text-sm text-gray-400">Tracking disabled</span>
+                          <span className="text-sm text-gray-400">--</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {tracking ? (
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="number"
+                              min={0}
+                              placeholder="Qty"
+                              value={getAdjustmentValue(item.id, 'out')}
+                              onChange={(e) => setAdjustmentValue(item.id, 'out', e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  commitStockAdjustment(item, 'out');
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                              disabled={isProcessing(item.id)}
+                              className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-red-500 focus:border-transparent placeholder-gray-400"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => commitStockAdjustment(item, 'out')}
+                              disabled={isProcessing(item.id) || !getAdjustmentValue(item.id, 'out')}
+                              className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-red-50 text-red-600 disabled:opacity-40 disabled:hover:bg-white"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">--</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -318,14 +390,14 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
                 })}
                 {!filteredItems.length && !loading && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-10 text-center text-gray-500">
                       No menu items found. Try adjusting your search.
                     </td>
                   </tr>
                 )}
                 {loading && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-10 text-center text-gray-500">
                       Loading inventory...
                     </td>
                   </tr>
