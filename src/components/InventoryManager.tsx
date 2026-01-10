@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, AlertTriangle, Minus, Plus, RefreshCw, Save } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, RefreshCw, Save } from 'lucide-react';
 import { MenuItem } from '../types';
 
 type InventoryManagerProps = {
@@ -41,32 +41,6 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
     }));
   };
 
-  const commitStockAdjustment = (item: MenuItem, type: 'in' | 'out') => {
-    const rawValue = getAdjustmentValue(item.id, type);
-    const delta = Math.floor(Number(rawValue));
-
-    if (!delta || delta <= 0) return;
-
-    // Determine current effective stock
-    const pending = pendingChanges[item.id] || {};
-    const currentStock = Number(pending.stockQuantity ?? item.stockQuantity ?? 0);
-
-    // Calculate new stock
-    const change = type === 'in' ? delta : -delta;
-    const nextStock = Math.max(0, currentStock + change);
-
-    setPendingChanges(prev => ({
-      ...prev,
-      [item.id]: {
-        ...prev[item.id],
-        trackInventory: true, // Auto-enable tracking if adjusting stock
-        stockQuantity: nextStock
-      }
-    }));
-
-    // Reset input
-    setAdjustmentValue(item.id, type, '');
-  };
 
   const updatePrice = (item: MenuItem, rawValue: string) => {
     const price = Math.max(0, parseFloat(rawValue) || 0);
@@ -119,30 +93,49 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
   };
 
   const handleSave = async () => {
-    const idsToUpdate = Object.keys(pendingChanges);
-    if (idsToUpdate.length === 0) return;
+    const changeIds = Object.keys(pendingChanges);
+    const adjustmentIds = Object.keys(adjustmentInputs).filter(id => {
+      const adj = adjustmentInputs[id];
+      return (Number(adj.in) || 0) > 0 || (Number(adj.out) || 0) > 0;
+    });
+
+    const allIdsToUpdate = Array.from(new Set([...changeIds, ...adjustmentIds]));
+    if (allIdsToUpdate.length === 0) return;
 
     setIsSaving(true);
     try {
-      // Process updates sequentially
-      for (const id of idsToUpdate) {
+      for (const id of allIdsToUpdate) {
         setProcessingId(id);
-        const updates = pendingChanges[id];
+        const item = items.find(i => i.id === id);
+        if (!item) continue;
+
+        let updates = { ...(pendingChanges[id] || {}) };
+        const adjustment = adjustmentInputs[id];
+
+        if (adjustment) {
+          const deltaIn = Math.max(0, Math.floor(Number(adjustment.in) || 0));
+          const deltaOut = Math.max(0, Math.floor(Number(adjustment.out) || 0));
+
+          if (deltaIn > 0 || deltaOut > 0) {
+            const currentStock = Number(updates.stockQuantity ?? item.stockQuantity ?? 0);
+            const nextStock = Math.max(0, currentStock + deltaIn - deltaOut);
+            updates.stockQuantity = nextStock;
+            updates.trackInventory = true; // Auto-enable tracking if adjusting stock
+          }
+        }
 
         // Calculate available status based on new values
-        const item = items.find(i => i.id === id);
-        if (item) {
-          const finalStock = updates.stockQuantity ?? item.stockQuantity ?? 0;
-          const finalThreshold = updates.lowStockThreshold ?? item.lowStockThreshold ?? 0;
-          const finalTrack = updates.trackInventory ?? item.trackInventory;
+        const finalStock = updates.stockQuantity ?? item.stockQuantity ?? 0;
+        const finalThreshold = updates.lowStockThreshold ?? item.lowStockThreshold ?? 0;
+        const finalTrack = updates.trackInventory ?? item.trackInventory;
 
-          if (finalTrack) {
-            updates.available = finalStock > finalThreshold;
-          }
+        if (finalTrack) {
+          updates.available = finalStock > finalThreshold;
         }
 
         await onUpdateItem(id, updates);
       }
+
       setPendingChanges({});
       setAdjustmentInputs({});
       alert('All changes saved successfully!');
@@ -154,6 +147,17 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
       setProcessingId(null);
     }
   };
+
+  const hasAdjustments = (id: string) => {
+    const adj = adjustmentInputs[id];
+    return !!adj && ((Number(adj.in) || 0) > 0 || (Number(adj.out) || 0) > 0);
+  };
+
+  const totalModifications = useMemo(() => {
+    const changeIds = Object.keys(pendingChanges);
+    const adjustmentIds = Object.keys(adjustmentInputs).filter(id => hasAdjustments(id));
+    return new Set([...changeIds, ...adjustmentIds]).size;
+  }, [pendingChanges, adjustmentInputs]);
 
   const handleDiscard = () => {
     if (confirm('Discard all unsaved changes?')) {
@@ -178,7 +182,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
                 <span>Dashboard</span>
               </button>
               <h1 className="text-2xl font-playfair font-semibold text-black">Inventory Management</h1>
-              {Object.keys(pendingChanges).length > 0 && (
+              {totalModifications > 0 && (
                 <span className="ml-4 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                   Unsaved Changes
                 </span>
@@ -226,7 +230,8 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredItems.map((item) => {
                   const pending = pendingChanges[item.id] || {};
-                  const hasChanges = Object.keys(pending).length > 0;
+                  const adjusted = hasAdjustments(item.id);
+                  const hasChanges = Object.keys(pending).length > 0 || adjusted;
 
                   // Merge original item with pending changes
                   const mergedItem = { ...item, ...pending };
@@ -279,66 +284,40 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {tracking ? (
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="number"
-                              min={0}
-                              placeholder="Qty"
-                              value={getAdjustmentValue(item.id, 'in')}
-                              onChange={(e) => setAdjustmentValue(item.id, 'in', e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  commitStockAdjustment(item, 'in');
-                                  e.currentTarget.blur();
-                                }
-                              }}
-                              disabled={isProcessing(item.id)}
-                              className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder-gray-400"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => commitStockAdjustment(item, 'in')}
-                              disabled={isProcessing(item.id) || !getAdjustmentValue(item.id, 'in')}
-                              className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-green-50 text-green-600 disabled:opacity-40 disabled:hover:bg-white"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-400">--</span>
-                        )}
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="number"
+                            min={0}
+                            placeholder="Qty"
+                            value={getAdjustmentValue(item.id, 'in')}
+                            onChange={(e) => setAdjustmentValue(item.id, 'in', e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.currentTarget.blur();
+                              }
+                            }}
+                            disabled={isProcessing(item.id)}
+                            className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder-gray-400"
+                          />
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {tracking ? (
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="number"
-                              min={0}
-                              placeholder="Qty"
-                              value={getAdjustmentValue(item.id, 'out')}
-                              onChange={(e) => setAdjustmentValue(item.id, 'out', e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  commitStockAdjustment(item, 'out');
-                                  e.currentTarget.blur();
-                                }
-                              }}
-                              disabled={isProcessing(item.id)}
-                              className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-red-500 focus:border-transparent placeholder-gray-400"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => commitStockAdjustment(item, 'out')}
-                              disabled={isProcessing(item.id) || !getAdjustmentValue(item.id, 'out')}
-                              className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-red-50 text-red-600 disabled:opacity-40 disabled:hover:bg-white"
-                            >
-                              <Minus className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-400">--</span>
-                        )}
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="number"
+                            min={0}
+                            placeholder="Qty"
+                            value={getAdjustmentValue(item.id, 'out')}
+                            onChange={(e) => setAdjustmentValue(item.id, 'out', e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.currentTarget.blur();
+                              }
+                            }}
+                            disabled={isProcessing(item.id)}
+                            className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-red-500 focus:border-transparent placeholder-gray-400"
+                          />
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {tracking ? (
@@ -409,11 +388,11 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
       </div>
 
       {/* Save Changes Floating Bar */}
-      {Object.keys(pendingChanges).length > 0 && (
+      {totalModifications > 0 && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-xl border border-gray-200 p-4 flex items-center gap-4 z-50 animate-fade-in-up">
           <div className="flex flex-col">
             <span className="text-sm font-medium text-gray-900">
-              {Object.keys(pendingChanges).length} item(s) modified
+              {totalModifications} item(s) modified
             </span>
             <span className="text-xs text-gray-500">
               Don't forget to save your changes

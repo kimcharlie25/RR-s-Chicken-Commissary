@@ -224,41 +224,62 @@ const OrdersManager: React.FC<OrdersManagerProps> = ({ onBack }) => {
     const handleDownloadInvoice = (order: OrderWithItems) => {
         try {
             const doc = new jsPDF();
+            const pageWidth = doc.internal.pageSize.width;
+            const margin = 14;
 
-            // Header
-            doc.addImage('/logo.jpg', 'JPEG', 14, 10, 25, 25)
-            doc.setFontSize(20);
-            doc.setTextColor(100, 24, 16);
-            doc.setFont('helvetica', 'bold');
-            doc.text("RR's Chicken Commissary", 105, 15, { align: 'center' });
-            doc.setTextColor(255, 0, 0);
+            // 1. Header (Top Left): Business Logo & Info
+            try {
+                // Attempt to add logo. If it fails, skip it.
+                doc.addImage('/logo.jpg', 'JPEG', margin, 10, 20, 20);
+            } catch (e) {
+                console.warn("Logo not found for PDF, skipping image.");
+            }
+
             doc.setFontSize(14);
-            doc.text("INVOICE", 105, 22, { align: 'center' });
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(100, 24, 16); // Match brand color
+            doc.text("RR's Chicken Commissary", margin + 22, 17);
+
+            doc.setFontSize(9);
             doc.setFont('helvetica', 'normal');
+            doc.setTextColor(0);
+            const businessInfo = [
+                "Kapalaran 3 Road, San Roque, Navotas City. 1484",
+                "Phone: 09244722191",
+                "Email: rrscommissary@gmail.com"
+            ];
+            doc.text(businessInfo, margin + 22, 22);
+
+            // 2. Header (Top Right): INVOICE, # and Date
+            doc.setFontSize(24);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(100, 24, 16);
+            doc.text("INVOICE", pageWidth - margin, 20, { align: 'right' });
+
             doc.setFontSize(10);
             doc.setTextColor(0);
-            doc.text("rrscommissary@gmail.com", 105, 26, { align: 'center' });
-            doc.text("09244722191", 105, 30, { align: 'center' });
-            doc.text("Kapalaran 3 Road, San Roque, Navotas City. 1484", 105, 34, { align: 'center' });
-
-            // Order Details
-            doc.setFontSize(10);
-            doc.text(`Order #: ${order.id.slice(-8).toUpperCase()}`, 14, 44);
-            doc.text(`Date: ${new Date(order.created_at).toLocaleDateString()}`, 14, 49);
-            // Customer Details Column
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Customer Details:', 14, 54);
             doc.setFont('helvetica', 'normal');
-            doc.text([
+            doc.text(`Invoice #: ${order.id.slice(-8).toUpperCase()}`, pageWidth - margin, 28, { align: 'right' });
+            doc.text(`Date: ${new Date(order.created_at).toLocaleDateString()}`, pageWidth - margin, 33, { align: 'right' });
+
+            // 3. Customer details Section (Mid-Left)
+            const customerY = 37;
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.text('BILL TO:', margin, customerY);
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            const customerDetails = [
                 `Name: ${order.customer_name}`,
                 `Branch: ${order.branch_name || 'N/A'}`,
                 `Contact: ${order.contact_number}`,
-                `Service: ${order.service_type.charAt(0).toUpperCase() + order.service_type.slice(1)}`
-            ], 14, 57);
+                `Service Type: ${formatServiceType(order.service_type)}`
+            ];
+            doc.text(customerDetails, margin, customerY + 6);
 
-            // Table Data
-            const tableColumn = ["#", "Items", "Unit (Description)", "Quantity", "Unit Cost", "Total"];
+            // 4. Items Table
+            const tableColumn = ["#", "Items", "Description", "Qty", "Unit Cost", "Total"];
             const tableRows = order.order_items.map((item, index) => {
                 const description = item.menu_items?.description || 'N/A';
                 const variation = item.variation ? ` (${item.variation.name})` : '';
@@ -271,22 +292,68 @@ const OrdersManager: React.FC<OrdersManagerProps> = ({ onBack }) => {
                     `${item.name}${variation}${addons}`,
                     description,
                     item.quantity,
-                    `P${item.unit_price.toFixed(2)}`,
-                    `P${item.subtotal.toFixed(2)}`
+                    `P${item.unit_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                    `P${item.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                 ];
             });
 
-            // Generate Table
             autoTable(doc, {
                 head: [tableColumn],
                 body: tableRows,
-                startY: 75, // Adjusted startY to accommodate new customer details block
+                startY: customerY + 30,
                 theme: 'grid',
-                headStyles: { fillColor: [252, 209, 9], textColor: [100, 24, 16] }, // yellow header to match theme
-                foot: [['', '', '', '', 'Overall Total:', `P${order.total.toFixed(2)}`]],
-                footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
+                headStyles: { fillColor: [252, 209, 9], textColor: [0, 0, 0], fontStyle: 'bold' },
                 styles: { fontSize: 9, cellPadding: 3 },
+                columnStyles: {
+                    0: { cellWidth: 10 },
+                    3: { halign: 'center' },
+                    4: { halign: 'right' },
+                    5: { halign: 'right' }
+                }
             });
+
+            // 5. Totals Section (Bottom Right)
+            const finalY = (doc as any).lastAutoTable.finalY + 10;
+            const totalsX = pageWidth - margin;
+
+            doc.setFontSize(10);
+            doc.text(`Subtotal:`, totalsX - 40, finalY, { align: 'right' });
+            doc.text(`P${order.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, totalsX, finalY, { align: 'right' });
+
+            doc.setFont('helvetica', 'bold');
+            doc.text(`Total:`, totalsX - 40, finalY + 7, { align: 'right' });
+            doc.text(`P${order.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, totalsX, finalY + 7, { align: 'right' });
+
+            // Balance Due Highlighted (Gold/Orange)
+            doc.text(`Balance Due:`, totalsX - 40, finalY + 18.5, { align: 'right' });
+            doc.setTextColor(252, 209, 9); // Gold color
+            doc.text(`P${order.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, totalsX - 2, finalY + 18.5, { align: 'right' });
+            doc.setTextColor(0);
+
+            // 6. Footer (Bottom Right)
+            const footerY = 250;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(100);
+
+            // Signature Image
+            try {
+                // Add signature image above the business name
+                doc.addImage('/signature.jpg', 'JPEG', pageWidth - margin - 40, footerY, 30, 15);
+            } catch (e) {
+                console.warn("Signature image not found for PDF, skipping.");
+                // Fallback line if image is missing
+                doc.line(pageWidth - 50, footerY + 15, pageWidth - margin, footerY + 15);
+            }
+
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(0);
+            const signatureTitleY = footerY + 20;
+            doc.text("RR's Chicken Commissary", pageWidth - margin, signatureTitleY, { align: 'right' });
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth - margin, signatureTitleY + 5, { align: 'right' });
 
             // Save PDF
             doc.save(`invoice_${order.id.slice(-8).toUpperCase()}.pdf`);
