@@ -191,9 +191,9 @@ Please confirm this order to proceed. Thank you for choosing RR's Chicken Commis
 📋 Order Code: #${orderId.slice(-8).toUpperCase()}
     `.trim();
 
-    const pageId = 'rrchickenribsnav';
+    const pageId = '09171633474';
     const encodedMessage = encodeURIComponent(orderDetails);
-    const webLink = `https://m.me/${pageId}?text=${encodedMessage}`;
+    const webLink = `https://wa.me/${pageId}?text=${encodedMessage}`;
 
     // Best effort: copy order details so user can paste in Messenger if text cannot be prefilled
     await copyOrderDetails(orderDetails);
