@@ -191,9 +191,9 @@ Please confirm this order to proceed. Thank you for choosing RR's Chicken Commis
 📋 Order Code: #${orderId.slice(-8).toUpperCase()}
     `.trim();
 
-    const pageId = 'rrchickenribsnav';
+    const pageId = '639171633474';
     const encodedMessage = encodeURIComponent(orderDetails);
-    const webLink = `https://m.me/${pageId}?text=${encodedMessage}`;
+    const webLink = `https://wa.me/${pageId}?text=${encodedMessage}`;
 
     // Best effort: copy order details so user can paste in Messenger if text cannot be prefilled
     await copyOrderDetails(orderDetails);
@@ -546,7 +546,7 @@ Please confirm this order to proceed. Thank you for choosing RR's Chicken Commis
             ) : creating ? (
               'Placing Order...'
             ) : (
-              'Place Order via Messenger'
+              'Place Order via WhatsApp'
             )}
           </button>
           {error && !uiNotice && (
@@ -554,7 +554,7 @@ Please confirm this order to proceed. Thank you for choosing RR's Chicken Commis
           )}
 
           <p className="text-xs text-gray-500 text-center mt-3">
-            You'll be redirected to Facebook Messenger to confirm your order. Don't forget to attach your payment screenshot!
+            You'll be redirected to WhatsApp to confirm your order. Don't forget to attach your payment screenshot!
           </p>
         </div>
       </div>
