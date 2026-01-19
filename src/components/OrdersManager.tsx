@@ -13,7 +13,7 @@ const OrdersManager: React.FC<OrdersManagerProps> = ({ onBack }) => {
     const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
     const [updating, setUpdating] = useState<string | null>(null);
     const [query, setQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled'>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'completed' | 'cancelled'>('all');
     const [sortKey, setSortKey] = useState<'created_at' | 'total' | 'customer_name' | 'status'>('created_at');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
     const [dateFrom, setDateFrom] = useState('');
@@ -30,8 +30,10 @@ const OrdersManager: React.FC<OrdersManagerProps> = ({ onBack }) => {
                 return 'bg-blue-100 text-blue-800';
             case 'ready':
                 return 'bg-purple-100 text-purple-800';
-            case 'completed':
+            case 'delivered':
                 return 'bg-gray-100 text-gray-800';
+            case 'completed':
+                return 'bg-green-100 text-green-800';
             case 'cancelled':
                 return 'bg-red-100 text-red-800';
             default:
@@ -48,6 +50,8 @@ const OrdersManager: React.FC<OrdersManagerProps> = ({ onBack }) => {
             case 'preparing':
                 return <RefreshCw className="h-4 w-4" />;
             case 'ready':
+                return <CheckCircle className="h-4 w-4" />;
+            case 'delivered':
                 return <CheckCircle className="h-4 w-4" />;
             case 'completed':
                 return <CheckCircle className="h-4 w-4" />;
@@ -452,6 +456,7 @@ const OrdersManager: React.FC<OrdersManagerProps> = ({ onBack }) => {
                                     <option value="confirmed">Confirmed</option>
                                     <option value="preparing">Preparing</option>
                                     <option value="ready">Ready</option>
+                                    <option value="delivered">Delivered</option>
                                     <option value="completed">Completed</option>
                                     <option value="cancelled">Cancelled</option>
                                 </select>
@@ -645,6 +650,7 @@ const OrdersManager: React.FC<OrdersManagerProps> = ({ onBack }) => {
                                                             <option value="confirmed">Confirmed</option>
                                                             <option value="preparing">Preparing</option>
                                                             <option value="ready">Ready</option>
+                                                            <option value="delivered">Delivered</option>
                                                             <option value="completed">Completed</option>
                                                             <option value="cancelled">Cancelled</option>
                                                         </select>

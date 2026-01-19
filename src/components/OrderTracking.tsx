@@ -24,8 +24,10 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ onBack }) => {
         return 'bg-purple-100 text-purple-800 border-purple-300';
       case 'ready':
         return 'bg-green-100 text-green-800 border-green-300';
+      case 'delivered':
+        return 'bg-green-100 text-green-800 border-green-300';
       case 'completed':
-        return 'bg-gray-100 text-gray-800 border-gray-300';
+        return 'bg-green-100 text-green-800 border-green-300';
       case 'cancelled':
         return 'bg-red-100 text-red-800 border-red-300';
       default:
@@ -42,6 +44,8 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ onBack }) => {
       case 'preparing':
         return <RefreshCw className="h-5 w-5" />;
       case 'ready':
+        return <Package className="h-5 w-5" />;
+      case 'delivered':
         return <Package className="h-5 w-5" />;
       case 'completed':
         return <CheckCircle className="h-5 w-5" />;
@@ -62,6 +66,8 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ onBack }) => {
         return 'Your order is being prepared.';
       case 'ready':
         return 'Your order is ready for pickup/delivery!';
+      case 'delivered':
+        return 'Your order has been delivered!';
       case 'completed':
         return 'Your order has been completed. Thank you!';
       case 'cancelled':
@@ -88,7 +94,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ onBack }) => {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!searchValue.trim()) {
       setError('Please enter a search value');
       return;
@@ -117,13 +123,13 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ onBack }) => {
             .limit(100);
 
           if (fetchError) throw fetchError;
-          
+
           const searchValueUpper = searchValue.trim().toUpperCase();
-          const matchingOrder = data?.find(order => 
+          const matchingOrder = data?.find(order =>
             order.id.slice(-8).toUpperCase().includes(searchValueUpper) ||
             order.id.toUpperCase().includes(searchValueUpper)
           );
-          
+
           if (matchingOrder) {
             setOrder(matchingOrder as OrderWithItems);
           } else {
@@ -158,7 +164,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ onBack }) => {
           .limit(1);
 
         if (fetchError) throw fetchError;
-        
+
         if (data && data.length > 0) {
           setOrder(data[0] as OrderWithItems);
         } else {
@@ -213,22 +219,20 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ onBack }) => {
               <button
                 type="button"
                 onClick={() => setSearchType('orderId')}
-                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${
-                  searchType === 'orderId'
-                    ? 'border-red-600 bg-red-50 text-red-700 font-medium'
-                    : 'border-gray-300 text-gray-700 hover:border-gray-400'
-                }`}
+                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${searchType === 'orderId'
+                  ? 'border-red-600 bg-red-50 text-red-700 font-medium'
+                  : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                  }`}
               >
                 Order ID
               </button>
               <button
                 type="button"
                 onClick={() => setSearchType('phone')}
-                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${
-                  searchType === 'phone'
-                    ? 'border-red-600 bg-red-50 text-red-700 font-medium'
-                    : 'border-gray-300 text-gray-700 hover:border-gray-400'
-                }`}
+                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${searchType === 'phone'
+                  ? 'border-red-600 bg-red-50 text-red-700 font-medium'
+                  : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                  }`}
               >
                 Phone Number
               </button>
@@ -377,7 +381,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ onBack }) => {
                       )}
                       {item.add_ons && item.add_ons.length > 0 && (
                         <p className="text-sm text-gray-600">
-                          Add-ons: {item.add_ons.map((addon: any) => 
+                          Add-ons: {item.add_ons.map((addon: any) =>
                             addon.quantity > 1 ? `${addon.name} x${addon.quantity}` : addon.name
                           ).join(', ')}
                         </p>
