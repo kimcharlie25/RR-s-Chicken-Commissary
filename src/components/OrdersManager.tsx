@@ -764,7 +764,7 @@ const OrdersManager: React.FC<OrdersManagerProps> = ({ onBack }) => {
                                         {selectedOrder.address && <p><strong>Address:</strong> {selectedOrder.address}</p>}
                                         {selectedOrder.pickup_time && <p><strong>Pickup Time:</strong> {selectedOrder.pickup_time}</p>}
                                         {selectedOrder.party_size && <p><strong>Party Size:</strong> {selectedOrder.party_size} person{selectedOrder.party_size !== 1 ? 's' : ''}</p>}
-                                        {selectedOrder.dine_in_time && <p><strong>Dine-in Time:</strong> {formatDateTime(selectedOrder.dine_in_time)}</p>}
+                                        {selectedOrder.dine_in_time && <p><strong>Ordered Time:</strong> {formatDateTime(selectedOrder.dine_in_time)}</p>}
                                         {selectedOrder.notes && <p><strong>Notes:</strong> {selectedOrder.notes}</p>}
                                         <p><strong>Total:</strong> ₱{selectedOrder.total.toFixed(2)}</p>
                                     </div>
