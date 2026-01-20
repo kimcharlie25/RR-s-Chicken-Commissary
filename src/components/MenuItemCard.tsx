@@ -49,7 +49,11 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
     if (item.variations?.length || item.addOns?.length) {
       setShowCustomization(true);
     } else {
-      onAddToCart(item, 1);
+      try {
+        onAddToCart(item, 1);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Error adding to cart');
+      }
     }
   };
 
@@ -58,14 +62,22 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
     const addOnsForCart: AddOn[] = selectedAddOns.flatMap(addOn =>
       Array(addOn.quantity).fill({ ...addOn, quantity: undefined })
     );
-    onAddToCart(item, 1, selectedVariation, addOnsForCart);
-    setShowCustomization(false);
-    setSelectedAddOns([]);
+    try {
+      onAddToCart(item, 1, selectedVariation, addOnsForCart);
+      setShowCustomization(false);
+      setSelectedAddOns([]);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error adding to cart');
+    }
   };
 
   const handleIncrement = () => {
     if (!cartItemId) return;
-    onUpdateQuantity(cartItemId, quantity + 1);
+    try {
+      onUpdateQuantity(cartItemId, quantity + 1);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error updating quantity');
+    }
   };
 
   const handleDecrement = () => {
@@ -220,13 +232,16 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
 
         {/* Stock indicator - small bar at bottom */}
         {item.trackInventory && item.stockQuantity !== null && (
-          <div className="px-4 pb-2">
-            {item.stockQuantity !== undefined && item.lowStockThreshold !== undefined && item.stockQuantity <= item.lowStockThreshold && item.stockQuantity > 0 ? (
-              <div className="text-[10px] text-orange-600 font-bold animate-pulse">
-                Low stock: {item.stockQuantity} left
+          <div className="px-4 pb-2 flex justify-between items-center text-[10px] font-bold">
+            <div className="text-gray-500 uppercase">
+              Stock: {item.stockQuantity}
+            </div>
+            {item.stockQuantity !== undefined && item.stockQuantity !== null && item.lowStockThreshold !== undefined && item.lowStockThreshold !== null && item.stockQuantity <= item.lowStockThreshold && item.stockQuantity > 0 ? (
+              <div className="text-orange-600 animate-pulse uppercase">
+                Low stock
               </div>
             ) : item.stockQuantity === 0 ? (
-              <div className="text-[10px] text-red-600 font-bold">
+              <div className="text-red-600 uppercase">
                 Out of stock
               </div>
             ) : null}

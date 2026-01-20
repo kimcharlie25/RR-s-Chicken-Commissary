@@ -18,14 +18,41 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
   // Local state for stock adjustment inputs: { [itemId]: { in: '0', out: '0' } }
   const [adjustmentInputs, setAdjustmentInputs] = useState<Record<string, { in: string; out: string }>>({});
 
+  const [inventoryStatusFilter, setInventoryStatusFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'zero_stock' | 'not_tracking'>('all');
+
   const filteredItems = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return items;
-    return items.filter((item) =>
+
+    let base = items;
+
+    // Status Filter
+    if (inventoryStatusFilter !== 'all') {
+      base = base.filter(item => {
+        const tracking = item.trackInventory;
+        const stock = item.stockQuantity ?? 0;
+        const threshold = item.lowStockThreshold ?? 0;
+
+        switch (inventoryStatusFilter) {
+          case 'in_stock':
+            return tracking && stock > threshold;
+          case 'low_stock':
+            return tracking && stock <= threshold && stock > 0;
+          case 'zero_stock':
+            return tracking && stock === 0;
+          case 'not_tracking':
+            return !tracking;
+          default:
+            return true;
+        }
+      });
+    }
+
+    if (!term) return base;
+    return base.filter((item) =>
       item.name.toLowerCase().includes(term) ||
       item.category.toLowerCase().includes(term)
     );
-  }, [items, query]);
+  }, [items, query, inventoryStatusFilter]);
 
   const getAdjustmentValue = (itemId: string, type: 'in' | 'out') => {
     return adjustmentInputs[itemId]?.[type] || '';
@@ -198,16 +225,27 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ items, onBack, onUp
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6 border border-gray-200">
           <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-            <div className="flex-1">
+            <div className="flex-1 flex flex-col md:flex-row gap-3">
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search menu items or categories"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
+              <select
+                value={inventoryStatusFilter}
+                onChange={(e) => setInventoryStatusFilter(e.target.value as any)}
+                className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm bg-white"
+              >
+                <option value="all">All Items</option>
+                <option value="in_stock">In Stock</option>
+                <option value="low_stock">Low Stock</option>
+                <option value="zero_stock">Zero Stock</option>
+                <option value="not_tracking">Not Tracking</option>
+              </select>
             </div>
             <div className="text-sm text-gray-500">
-              Track inventory to automatically disable low-stock items.
+              {filteredItems.length} items filtered by {inventoryStatusFilter.replace('_', ' ')} status.
             </div>
           </div>
         </div>

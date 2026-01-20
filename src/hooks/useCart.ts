@@ -20,6 +20,17 @@ export const useCart = () => {
   };
 
   const addToCart = useCallback((item: MenuItem, quantity: number = 1, variation?: Variation, addOns?: AddOn[]) => {
+    // Check stock if tracking
+    if (item.trackInventory && item.stockQuantity !== null && item.stockQuantity !== undefined) {
+      const existingQuantity = cartItems
+        .filter(ci => ci.menuItemId === item.id)
+        .reduce((sum, ci) => sum + ci.quantity, 0);
+
+      if (existingQuantity + quantity > item.stockQuantity) {
+        throw new Error(`Only ${item.stockQuantity} units available in stock.`);
+      }
+    }
+
     const totalPrice = calculateItemPrice(item, variation, addOns);
     const menuItemId = item.id;
 
@@ -35,12 +46,12 @@ export const useCart = () => {
     }, [] as (AddOn & { quantity: number })[]);
 
     setCartItems(prev => {
-      const existingItem = prev.find(cartItem => 
-        cartItem.menuItemId === menuItemId && 
+      const existingItem = prev.find(cartItem =>
+        cartItem.menuItemId === menuItemId &&
         cartItem.selectedVariation?.id === variation?.id &&
         JSON.stringify(cartItem.selectedAddOns?.map(a => `${a.id}-${a.quantity || 1}`).sort()) === JSON.stringify(groupedAddOns?.map(a => `${a.id}-${a.quantity}`).sort())
       );
-      
+
       if (existingItem) {
         return prev.map(cartItem =>
           cartItem === existingItem
@@ -49,7 +60,7 @@ export const useCart = () => {
         );
       } else {
         const uniqueId = `${item.id}-${variation?.id || 'default'}-${addOns?.map(a => a.id).join(',') || 'none'}`;
-        return [...prev, { 
+        return [...prev, {
           ...item,
           id: uniqueId,
           menuItemId,
@@ -60,6 +71,10 @@ export const useCart = () => {
         }];
       }
     });
+  }, [cartItems]);
+
+  const removeFromCart = useCallback((id: string) => {
+    setCartItems(prev => prev.filter(item => item.id !== id));
   }, []);
 
   const updateQuantity = useCallback((id: string, quantity: number) => {
@@ -67,17 +82,24 @@ export const useCart = () => {
       removeFromCart(id);
       return;
     }
-    
+
+    const itemToUpdate = cartItems.find(item => item.id === id);
+    if (itemToUpdate && itemToUpdate.trackInventory && itemToUpdate.stockQuantity !== null && itemToUpdate.stockQuantity !== undefined) {
+      const otherItemsQuantity = cartItems
+        .filter(ci => ci.menuItemId === itemToUpdate.menuItemId && ci.id !== id)
+        .reduce((sum, ci) => sum + ci.quantity, 0);
+
+      if (otherItemsQuantity + quantity > itemToUpdate.stockQuantity) {
+        throw new Error(`Only ${itemToUpdate.stockQuantity} units available in stock.`);
+      }
+    }
+
     setCartItems(prev =>
       prev.map(item =>
         item.id === id ? { ...item, quantity } : item
       )
     );
-  }, []);
-
-  const removeFromCart = useCallback((id: string) => {
-    setCartItems(prev => prev.filter(item => item.id !== id));
-  }, []);
+  }, [cartItems, removeFromCart]);
 
   const clearCart = useCallback(() => {
     setCartItems([]);

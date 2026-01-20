@@ -94,6 +94,37 @@ export const useOrders = () => {
         try {
             setError(null);
 
+            // Fetch the current order to check its items if it's being cancelled
+            if (status.toLowerCase() === 'cancelled') {
+                const { data: order, error: fetchOrderError } = await supabase
+                    .from('orders')
+                    .select('id, status, order_items (item_id, quantity)')
+                    .eq('id', orderId)
+                    .single();
+
+                if (fetchOrderError) throw fetchOrderError;
+
+                // Only restore stock if it wasn't already cancelled
+                if (order && order.status.toLowerCase() !== 'cancelled') {
+                    const stockAdjustments = order.order_items.reduce<Record<string, number>>((acc, item) => {
+                        acc[item.item_id] = (acc[item.item_id] || 0) + item.quantity;
+                        return acc;
+                    }, {});
+
+                    const inventoryPayload = Object.entries(stockAdjustments).map(([id, quantity]) => ({ id, quantity }));
+
+                    if (inventoryPayload.length > 0) {
+                        const { error: inventoryError } = await supabase.rpc('increment_menu_item_stock', {
+                            items: inventoryPayload,
+                        });
+
+                        if (inventoryError) {
+                            console.error('Failed to restore inventory:', inventoryError);
+                        }
+                    }
+                }
+            }
+
             const { error: updateError } = await supabase
                 .from('orders')
                 .update({ status })
